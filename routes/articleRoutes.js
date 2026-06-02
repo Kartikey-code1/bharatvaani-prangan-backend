@@ -1,7 +1,7 @@
 import express from "express";
 import cloudinary from "../config/cloudinary.js";
 import streamifier from "streamifier";
-import Article from "../models/Article.js";
+import Article from "../models/article.js";
 import upload from "../middleware/upload.js";
 
 const router = express.Router();
