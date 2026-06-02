@@ -1,0 +1,1 @@
+import RSS from 'rss'; export function buildRSS(items=[]){const feed=new RSS({title:'Bharatvaani Prangan', site_url:process.env.CLIENT_URL, feed_url:(process.env.CLIENT_URL||'')+'/rss.xml'}); items.forEach(n=>feed.item({title:n.headline, description:n.shortDescription, url:`${process.env.CLIENT_URL}/article/${n.slug}`, date:n.createdAt})); return feed.xml();}

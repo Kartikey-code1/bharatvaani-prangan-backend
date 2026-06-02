@@ -1,0 +1,1 @@
+import {Router} from 'express'; import { subscribe, listSubscribers, sendLatestNewsletter } from '../controllers/subscriberController.js'; import { requireAuth } from '../middleware/auth.js'; const router=Router(); router.post('/', subscribe); router.get('/', requireAuth, listSubscribers); router.post('/send-newsletter', requireAuth, sendLatestNewsletter); export default router;

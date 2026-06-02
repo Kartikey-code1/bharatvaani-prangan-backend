@@ -1,0 +1,1 @@
+import {Router} from 'express'; import { listSocialLogs, retrySocialPost } from '../controllers/socialController.js'; import { requireAuth } from '../middleware/auth.js'; const router=Router(); router.get('/logs', requireAuth, listSocialLogs); router.post('/retry/:id', requireAuth, retrySocialPost); export default router;

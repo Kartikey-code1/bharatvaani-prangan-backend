@@ -1,0 +1,1 @@
+export function generateCaption(article){return `Headline: ${article.headline}\nShort Summary: ${article.shortDescription||''}\nRead full news: ${process.env.CLIENT_URL}/article/${article.slug}\nHashtags: #BharatvaaniPrangan #BreakingNews #HindiNews #IndiaNews`;}
