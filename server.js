@@ -11,7 +11,7 @@ import articleRoutes from "./routes/articleRoutes.js";
 
 const app = express();
 
-// Middlewares - CORS ko fully open kiya hai taaki request block na ho
+// Middlewares - CORS fully open for production
 app.use(cors({
   origin: "*", 
   methods: ["GET", "POST", "PUT", "DELETE"],
@@ -23,7 +23,7 @@ app.use(express.json());
 // Routes
 app.use("/api/articles", articleRoutes);
 
-// MongoDB Connection with detailed logging
+// MongoDB Connection
 const connectDB = async () => {
   try {
     if (!process.env.MONGO_URI) {
@@ -41,13 +41,23 @@ connectDB();
 // Admin Login
 app.post("/api/admin/login", (req, res) => {
   const { email, password } = req.body;
-  const expectedEmail = process.env.ADMIN_EMAIL || "bharatvaaniprangan@gmail.com";
-  const expectedPassword = process.env.ADMIN_PASSWORD || "123456";
+  
+  // Ab ye sirf tumhare environment variables se password uthaega
+  const expectedEmail = process.env.ADMIN_EMAIL;
+  const expectedPassword = process.env.ADMIN_PASSWORD;
 
   if (email === expectedEmail && password === expectedPassword) {
-    return res.json({ success: true, token: "secure_dummy_token_xyz123", message: "Login successful!" });
+    return res.json({ 
+      success: true, 
+      token: "secure_token_xyz123", 
+      message: "Login successful!" 
+    });
   }
-  return res.status(401).json({ success: false, message: "Galat Email ya Password!" });
+
+  return res.status(401).json({ 
+    success: false, 
+    message: "Galat Email ya Password!" 
+  });
 });
 
 // Health Check
