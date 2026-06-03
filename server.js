@@ -3,69 +3,47 @@ import mongoose from "mongoose";
 import dotenv from "dotenv";
 import cors from "cors";
 
+// 1. Sabse pehle dotenv load karo
 dotenv.config();
 
-// Important: Cloudinary aur Routes imports
 import "./config/cloudinary.js";
 import articleRoutes from "./routes/articleRoutes.js";
 
 const app = express();
 
-// Middlewares - CORS fully open for production
-app.use(cors({
-  origin: "*", 
-  methods: ["GET", "POST", "PUT", "DELETE"],
-  credentials: true
-}));
-
+app.use(cors({ origin: "*", methods: ["GET", "POST", "PUT", "DELETE"], credentials: true }));
 app.use(express.json());
 
-// Routes
 app.use("/api/articles", articleRoutes);
 
-// MongoDB Connection
-const connectDB = async () => {
+// 2. Admin Login
+app.post("/api/admin/login", (req, res) => {
+  const { email, password } = req.body;
+  if (email === process.env.ADMIN_EMAIL && password === process.env.ADMIN_PASSWORD) {
+    return res.json({ success: true, token: "secure_token_xyz123", message: "Login successful!" });
+  }
+  return res.status(401).json({ success: false, message: "Galat Email ya Password!" });
+});
+
+app.get("/", (req, res) => res.json({ success: true, message: "Backend Running 🚀" }));
+
+// 3. Database Connection ko yahan handle karo
+const startServer = async () => {
   try {
     if (!process.env.MONGO_URI) {
-      console.error("❌ ERROR: MONGO_URI is not defined in .env!");
-      return;
+      throw new Error("MONGO_URI is not defined in Environment Variables!");
     }
     await mongoose.connect(process.env.MONGO_URI);
     console.log("✅ MongoDB Connected Successfully!");
+
+    const PORT = process.env.PORT || 5000;
+    app.listen(PORT, () => {
+      console.log(`🚀 Server running on port ${PORT}`);
+    });
   } catch (error) {
     console.error("❌ MongoDB Connection Error:", error.message);
+    process.exit(1); // Error hone par process band ho jaye taaki Render restart kare
   }
 };
-connectDB();
 
-// Admin Login
-app.post("/api/admin/login", (req, res) => {
-  const { email, password } = req.body;
-  
-  // Ab ye sirf tumhare environment variables se password uthaega
-  const expectedEmail = process.env.ADMIN_EMAIL;
-  const expectedPassword = process.env.ADMIN_PASSWORD;
-
-  if (email === expectedEmail && password === expectedPassword) {
-    return res.json({ 
-      success: true, 
-      token: "secure_token_xyz123", 
-      message: "Login successful!" 
-    });
-  }
-
-  return res.status(401).json({ 
-    success: false, 
-    message: "Galat Email ya Password!" 
-  });
-});
-
-// Health Check
-app.get("/", (req, res) => {
-  res.json({ success: true, message: "Bharatvaani Backend Running 🚀" });
-});
-
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-});
+startServer();
