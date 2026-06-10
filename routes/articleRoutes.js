@@ -4,6 +4,10 @@ import streamifier from "streamifier";
 import Article from "../models/article.js";
 import upload from "../middleware/upload.js";
 
+// 🔥 controllers/newsController.js se syncExternalNews function pull ho raha hai
+import { syncExternalNews } from "../controllers/newsController.js";
+import { publishEverywhere } from "../services/newsService.js";
+
 const router = express.Router();
 
 const uploadToCloudinary = (buffer, resourceType = "image") => {
@@ -21,6 +25,10 @@ const uploadToCloudinary = (buffer, resourceType = "image") => {
     streamifier.createReadStream(buffer).pipe(stream);
   });
 };
+
+// 🔥 1. AUTOMATIC SYNC ROUTE (ABP News & NDTV India API integration)
+// Endpoint: GET https://bharatvaani-backend.onrender.com/api/articles/sync-channels
+router.get("/sync-channels", syncExternalNews);
 
 // GET ALL ARTICLES
 router.get("/", async (req, res) => {
@@ -45,7 +53,7 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-// MANUAL ARTICLE PUBLISH
+// 🔥 2. MANUAL ARTICLE PUBLISH (Dashboard Form controller)
 router.post(
   "/",
   upload.fields([
@@ -54,7 +62,7 @@ router.post(
   ]),
   async (req, res) => {
     try {
-      const { title, category, content } = req.body;
+      const { title, category, content, publishEverywhere: flag } = req.body;
 
       if (!title || !content) {
         return res.status(400).json({
@@ -86,26 +94,48 @@ router.post(
 
       const article = new Article({
         title,
-        category,
+        category: category || "National",
         content,
-        image: imageUrl,
-        video: videoUrl,
+        image: imageUrl || null,
+        video: videoUrl || null,
+        status: "published"
       });
+
+      // Automatically generate slug if model needs it explicitly
+      if (!article.slug) {
+        article.slug = title.toLowerCase().replace(/[^a-zA-Z0-9]/g, "-") + "-" + Date.now();
+      }
 
       await article.save();
 
-      res.status(201).json({
-        success: true,
-        article,
-      });
+      // 🔥 SOCIAL MEDIA SHARING PIPELINE TRIGGER (Everywhere Check)
+      if (flag === "true" || flag === true) {
+        try {
+          await publishEverywhere(article);
+          console.log(`✅ Dashboard content shared to Social Handles: ${title}`);
+        } catch (socialError) {
+          console.error("Social Media trigger encountered a minor lag:", socialError.message);
+        }
+      }
+
+      res.status(201).json({ success: true, data: article });
     } catch (err) {
-      console.error("Publish Error:", err);
-      res.status(500).json({
-        success: false,
-        error: err.message,
-      });
+      res.status(500).json({ success: false, error: err.message });
     }
   }
 );
+
+// DELETE ARTICLE ENDPOINT FOR THE MANAGE PAGE
+router.delete("/:id", async (req, res) => {
+  try {
+    const article = await Article.findByIdAndDelete(req.params.id);
+    if (!article) {
+      return res.status(404).json({ success: false, message: "Article not found" });
+    }
+    res.json({ success: true, message: "Deleted successfully" });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 
 export default router;
