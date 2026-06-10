@@ -4,19 +4,23 @@ import streamifier from "streamifier";
 import Article from "../models/article.js";
 import upload from "../middleware/upload.js";
 
-// 🔥 controllers/newsController.js se syncExternalNews function pull ho raha hai
 import { syncExternalNews } from "../controllers/newsController.js";
-import { publishEverywhere } from "../services/newsService.js";
+
+// 🔴 SAFE GUARD: Is poore try-catch wrapper se import fail hone par server nahi phatega
+let publishEverywhere = null;
+try {
+  const service = await import("../services/newsService.js");
+  publishEverywhere = service.publishEverywhere;
+} catch (e) {
+  console.log("⚠️ Watchout: newsService.js file server par nahi mili, social auto-post skipped.");
+}
 
 const router = express.Router();
 
 const uploadToCloudinary = (buffer, resourceType = "image") => {
   return new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
-      {
-        resource_type: resourceType,
-        folder: "bharatvaani",
-      },
+      { resource_type: resourceType, folder: "bharatvaani" },
       (error, result) => {
         if (error) reject(error);
         else resolve(result);
@@ -26,8 +30,7 @@ const uploadToCloudinary = (buffer, resourceType = "image") => {
   });
 };
 
-// 🔥 1. AUTOMATIC SYNC ROUTE (ABP News & NDTV India API integration)
-// Endpoint: GET https://bharatvaani-backend.onrender.com/api/articles/sync-channels
+// AUTOMATIC SYNC ROUTE
 router.get("/sync-channels", syncExternalNews);
 
 // GET ALL ARTICLES
@@ -44,16 +47,14 @@ router.get("/", async (req, res) => {
 router.get("/:id", async (req, res) => {
   try {
     const article = await Article.findById(req.params.id);
-    if (!article) {
-      return res.status(404).json({ message: "Article not found" });
-    }
+    if (!article) return res.status(404).json({ message: "Article not found" });
     res.json(article);
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// 🔥 2. MANUAL ARTICLE PUBLISH (Dashboard Form controller)
+// MANUAL ARTICLE PUBLISH
 router.post(
   "/",
   upload.fields([
@@ -65,30 +66,19 @@ router.post(
       const { title, category, content, publishEverywhere: flag } = req.body;
 
       if (!title || !content) {
-        return res.status(400).json({
-          success: false,
-          message: "Title and Content required",
-        });
+        return res.status(400).json({ success: false, message: "Title and Content required" });
       }
 
       let imageUrl = "";
       let videoUrl = "";
 
-      // Upload Image
       if (req.files?.image?.[0]) {
-        const img = await uploadToCloudinary(
-          req.files.image[0].buffer,
-          "image"
-        );
+        const img = await uploadToCloudinary(req.files.image[0].buffer, "image");
         imageUrl = img.secure_url;
       }
 
-      // Upload Video
       if (req.files?.video?.[0]) {
-        const vid = await uploadToCloudinary(
-          req.files.video[0].buffer,
-          "video"
-        );
+        const vid = await uploadToCloudinary(req.files.video[0].buffer, "video");
         videoUrl = vid.secure_url;
       }
 
@@ -101,20 +91,18 @@ router.post(
         status: "published"
       });
 
-      // Automatically generate slug if model needs it explicitly
       if (!article.slug) {
         article.slug = title.toLowerCase().replace(/[^a-zA-Z0-9]/g, "-") + "-" + Date.now();
       }
 
       await article.save();
 
-      // 🔥 SOCIAL MEDIA SHARING PIPELINE TRIGGER (Everywhere Check)
-      if (flag === "true" || flag === true) {
+      // 🔥 Trigger only if service exists perfectly
+      if ((flag === "true" || flag === true) && publishEverywhere) {
         try {
           await publishEverywhere(article);
-          console.log(`✅ Dashboard content shared to Social Handles: ${title}`);
         } catch (socialError) {
-          console.error("Social Media trigger encountered a minor lag:", socialError.message);
+          console.error("Social Media Trigger Lag:", socialError.message);
         }
       }
 
@@ -125,13 +113,11 @@ router.post(
   }
 );
 
-// DELETE ARTICLE ENDPOINT FOR THE MANAGE PAGE
+// DELETE ARTICLE
 router.delete("/:id", async (req, res) => {
   try {
     const article = await Article.findByIdAndDelete(req.params.id);
-    if (!article) {
-      return res.status(404).json({ success: false, message: "Article not found" });
-    }
+    if (!article) return res.status(404).json({ success: false, message: "Article not found" });
     res.json({ success: true, message: "Deleted successfully" });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
