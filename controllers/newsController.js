@@ -1,12 +1,9 @@
 import axios from 'axios';
 import slugify from 'slugify';
-// 👑 FIX 1: Model import ko News se badal kar Article kar diya jo tumhara asli schema hai
 import Article from '../models/article.js'; 
 import { publishEverywhere } from '../services/newsService.js';
 
-// ---- Purane functions (getNews, createNews, etc.) ko waise hi rehne dena ----
-
-// 🔥 NAYA AUTOMATIC SETUP FOR ABP & NDTV (FIXED VERSION)
+// 🔥 AUTOMATIC CHANNEL SYNC FOR ABP & NDTV (FINAL RE-MAPPED MECHANISM)
 export async function syncExternalNews(req, res) {
   try {
     const API_KEY = process.env.NEWSDATA_API_KEY; 
@@ -24,16 +21,24 @@ export async function syncExternalNews(req, res) {
     let newCount = 0;
 
     for (let item of articles) {
-      // 👑 FIX 2: Check karne ke liye 'title' ki jagah 'headline' use hoga database query mein
-      const exists = await Article.findOne({ headline: item.title });
+      // Dono conditions check kar rahe hain taaki koi duplicate na ho
+      const exists = await Article.findOne({
+        $or: [
+          { title: item.title },
+          { headline: item.title }
+        ]
+      });
       
       if (!exists) {
-        const slug = slugify(item.title || 'news', { lower: true, strict: true }) + '-' + Date.now();
+        // Title validation safeguard strings clean up
+        const articleTitle = item.title || "मुख्य समाचार";
+        const slug = slugify(articleTitle, { lower: true, strict: true }) + '-' + Date.now();
         
-        // 👑 FIX 3: Item title ko 'headline' mein save kiya taaki Validation failed ka error permanently khatam ho jaye!
+        // 👑 SAFE MAP ENGINE: Title aur Headline dono ko bhar diya taaki validation fail na ho!
         const newArticle = await Article.create({
-          headline: item.title,                      // 👈 Mandatory Field Mapped!
-          content: item.description || "पूरा समाचार पढ़ने के लिए बने रहें।",
+          title: articleTitle,                       // 👈 Path `title` is satisfied!
+          headline: articleTitle,                    // 👈 Path `headline` is satisfied!
+          content: item.description || item.content || "पूरा समाचार पढ़ने के लिए बने रहें।",
           category: "National", 
           image: item.image_url || null,
           video: item.video_url || null,
@@ -43,13 +48,13 @@ export async function syncExternalNews(req, res) {
 
         newCount++;
 
-        // 🔥 SOCIAL MEDIA AUTO-POST: Agar is auto-fetched article ko social media par bhejna hai
+        // Social handles trigger
         if (newArticle.image && typeof publishEverywhere === 'function') {
           try {
             await publishEverywhere(newArticle); 
-            console.log(`✅ Social Media Shared: ${item.title}`);
+            console.log(`✅ Social Media Queue Triggered: ${articleTitle}`);
           } catch (socErr) {
-            console.error("Social media auto-share failed for this post:", socErr.message);
+            console.error("Social media automation delay skipped:", socErr.message);
           }
         }
       }
@@ -57,11 +62,15 @@ export async function syncExternalNews(req, res) {
 
     res.status(200).json({ 
       success: true, 
-      message: `Sync complete! ${newCount} nayi khabrein ABP/NDTV se aayi hain aur social media par ja chuki hain.` 
+      message: `Sync complete! ${newCount} nayi khabrein ABP/NDTV se aayi hain.` 
     });
 
   } catch (error) {
-    console.error("Newsdata sync error:", error);
-    res.status(500).json({ success: false, message: "Automatic channel sync failed", details: error.message });
+    console.error("Newsdata sync error detailed analysis:", error);
+    res.status(500).json({ 
+      success: false, 
+      message: "Automatic channel sync failed", 
+      details: error.message 
+    });
   }
 }
