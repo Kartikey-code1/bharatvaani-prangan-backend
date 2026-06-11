@@ -1,30 +1,33 @@
 // backend/services/newsService.js
+import axios from 'axios';
 
-/**
- * 🔥 SOCIAL MEDIA SHARING SERVICE
- * Yeh function automatic tumhari news articles aur unki images ko
- * connected social media platforms par push karne ka kaam karega.
- */
 export const publishEverywhere = async (article) => {
   try {
-    if (!article || !article.title) {
-      console.log("⚠️ Service Error: Share karne ke liye koi valid article nahi mila.");
-      return false;
-    }
+    if (!article || !article.title) return false;
 
-    console.log(`🚀 Social Media Pipeline Triggered for: "${article.title}"`);
+    console.log(`🚀 Real Social Media Pipeline Triggered for: "${article.title}"`);
     
-    if (article.image) {
-      console.log(`📸 Image Upload Target: ${article.image}`);
-      // TODO: Tumhara custom Facebook/Instagram/Twitter API post request yahan handle hoga
-    } else {
-      console.log("📝 Only Text Post: Is article mein koi image nahi hai.");
+    // 🔴 1. FACEBOOK PAGE AUTO-POST
+    const FB_PAGE_ID = process.env.FACEBOOK_PAGE_ID;
+    const FB_ACCESS_TOKEN = process.env.FACEBOOK_ACCESS_TOKEN;
+
+    if (FB_ACCESS_TOKEN && FB_PAGE_ID && article.image) {
+      // Meta Graph API ke zariye image aur caption page par push karna
+      await axios.post(`https://graph.facebook.com/${FB_PAGE_ID}/photos`, {
+        url: article.image,
+        caption: `🚨 ${article.title}\n\nपूरा समाचार पढ़ें: https://bharatvaaniprangan.com/article/${article._id || article.slug}`,
+        access_token: FB_ACCESS_TOKEN
+      });
+      console.log("✅ Facebook Page par photo post ho gayi!");
     }
 
-    // Abhi ke liye true return kar rahe hain taaki backend bina rukavat ke smoothly chale
+    // 🔴 2. TWITTER / X AUTO-POST
+    // (Iske liye twitter-api-v2 library ya oauth requests lagte hain)
+
     return true;
   } catch (error) {
-    console.error("🔴 Error inside newsService share mechanism:", error.message);
-    throw error;
+    // Agar koi social API fail ho toh console mein error dikhega, par tumhara main website server nahi rukega
+    console.error("🔴 Social media posting mein dikhkat aayi:", error.response?.data || error.message);
+    return false;
   }
 };
