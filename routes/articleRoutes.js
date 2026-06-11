@@ -4,23 +4,19 @@ import streamifier from "streamifier";
 import Article from "../models/article.js";
 import upload from "../middleware/upload.js";
 
+// controllers/newsController.js se syncExternalNews function pull ho raha hai
 import { syncExternalNews } from "../controllers/newsController.js";
-
-// 🔴 SAFE GUARD: Is poore try-catch wrapper se import fail hone par server nahi phatega
-let publishEverywhere = null;
-try {
-  const service = await import("../services/newsService.js");
-  publishEverywhere = service.publishEverywhere;
-} catch (e) {
-  console.log("⚠️ Watchout: newsService.js file server par nahi mili, social auto-post skipped.");
-}
+import { publishEverywhere } from "../services/newsService.js";
 
 const router = express.Router();
 
 const uploadToCloudinary = (buffer, resourceType = "image") => {
   return new Promise((resolve, reject) => {
     const stream = cloudinary.uploader.upload_stream(
-      { resource_type: resourceType, folder: "bharatvaani" },
+      {
+        resource_type: resourceType,
+        folder: "bharatvaani",
+      },
       (error, result) => {
         if (error) reject(error);
         else resolve(result);
@@ -29,9 +25,6 @@ const uploadToCloudinary = (buffer, resourceType = "image") => {
     streamifier.createReadStream(buffer).pipe(stream);
   });
 };
-
-// AUTOMATIC SYNC ROUTE
-router.get("/sync-channels", syncExternalNews);
 
 // GET ALL ARTICLES
 router.get("/", async (req, res) => {
@@ -43,11 +36,17 @@ router.get("/", async (req, res) => {
   }
 });
 
-// GET SINGLE ARTICLE
+// 🔥 1. AUTOMATIC SYNC ROUTE (Hamesha isko :id waale ke UPAR hona chahiye)
+// Endpoint: GET https://bharatvaani-prangan-backend-1.onrender.com/api/articles/sync-channels
+router.get("/sync-channels", syncExternalNews);
+
+// 🔥 2. GET SINGLE ARTICLE (Yeh ab niche hai, toh ab dynamic conflict nahi hoga)
 router.get("/:id", async (req, res) => {
   try {
     const article = await Article.findById(req.params.id);
-    if (!article) return res.status(404).json({ message: "Article not found" });
+    if (!article) {
+      return res.status(404).json({ message: "Article not found" });
+    }
     res.json(article);
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -66,19 +65,30 @@ router.post(
       const { title, category, content, publishEverywhere: flag } = req.body;
 
       if (!title || !content) {
-        return res.status(400).json({ success: false, message: "Title and Content required" });
+        return res.status(400).json({
+          success: false,
+          message: "Title and Content required",
+        });
       }
 
       let imageUrl = "";
       let videoUrl = "";
 
+      // Upload Image
       if (req.files?.image?.[0]) {
-        const img = await uploadToCloudinary(req.files.image[0].buffer, "image");
+        const img = await uploadToCloudinary(
+          req.files.image[0].buffer,
+          "image"
+        );
         imageUrl = img.secure_url;
       }
 
+      // Upload Video
       if (req.files?.video?.[0]) {
-        const vid = await uploadToCloudinary(req.files.video[0].buffer, "video");
+        const vid = await uploadToCloudinary(
+          req.files.video[0].buffer,
+          "video"
+        );
         videoUrl = vid.secure_url;
       }
 
@@ -97,12 +107,13 @@ router.post(
 
       await article.save();
 
-      // 🔥 Trigger only if service exists perfectly
-      if ((flag === "true" || flag === true) && publishEverywhere) {
+      // SOCIAL MEDIA SHARING PIPELINE TRIGGER
+      if (flag === "true" || flag === true) {
         try {
           await publishEverywhere(article);
+          console.log(`✅ Dashboard content shared to Social Handles: ${title}`);
         } catch (socialError) {
-          console.error("Social Media Trigger Lag:", socialError.message);
+          console.error("Social Media trigger encountered a minor lag:", socialError.message);
         }
       }
 
@@ -113,11 +124,13 @@ router.post(
   }
 );
 
-// DELETE ARTICLE
+// DELETE ARTICLE ENDPOINT FOR THE MANAGE PAGE
 router.delete("/:id", async (req, res) => {
   try {
     const article = await Article.findByIdAndDelete(req.params.id);
-    if (!article) return res.status(404).json({ success: false, message: "Article not found" });
+    if (!article) {
+      return res.status(404).json({ success: false, message: "Article not found" });
+    }
     res.json({ success: true, message: "Deleted successfully" });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
