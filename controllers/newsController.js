@@ -1,4 +1,4 @@
-// Is file ke top par check karna axios import hona chahiye: import axios from 'axios';
+import axios from 'axios';
 import slugify from 'slugify';
 import News from '../models/News.js';
 import { publishEverywhere } from '../services/newsService.js';
