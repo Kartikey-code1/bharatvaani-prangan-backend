@@ -1,11 +1,12 @@
 import axios from 'axios';
 import slugify from 'slugify';
-import News from '../models/News.js';
+// 👑 FIX 1: Model import ko News se badal kar Article kar diya jo tumhara asli schema hai
+import Article from '../models/article.js'; 
 import { publishEverywhere } from '../services/newsService.js';
 
 // ---- Purane functions (getNews, createNews, etc.) ko waise hi rehne dena ----
 
-// 🔥 NAYA AUTOMATIC SETUP FOR ABP & NDTV
+// 🔥 NAYA AUTOMATIC SETUP FOR ABP & NDTV (FIXED VERSION)
 export async function syncExternalNews(req, res) {
   try {
     const API_KEY = process.env.NEWSDATA_API_KEY; 
@@ -23,15 +24,15 @@ export async function syncExternalNews(req, res) {
     let newCount = 0;
 
     for (let item of articles) {
-      // Check karo ki kya yeh khabar pehle se database mein hai
-      const exists = await News.findOne({ title: item.title });
+      // 👑 FIX 2: Check karne ke liye 'title' ki jagah 'headline' use hoga database query mein
+      const exists = await Article.findOne({ headline: item.title });
       
       if (!exists) {
         const slug = slugify(item.title || 'news', { lower: true, strict: true }) + '-' + Date.now();
         
-        // Database mein save ho raha hai
-        const newArticle = await News.create({
-          title: item.title,
+        // 👑 FIX 3: Item title ko 'headline' mein save kiya taaki Validation failed ka error permanently khatam ho jaye!
+        const newArticle = await Article.create({
+          headline: item.title,                      // 👈 Mandatory Field Mapped!
           content: item.description || "पूरा समाचार पढ़ने के लिए बने रहें।",
           category: "National", 
           image: item.image_url || null,
@@ -43,12 +44,12 @@ export async function syncExternalNews(req, res) {
         newCount++;
 
         // 🔥 SOCIAL MEDIA AUTO-POST: Agar is auto-fetched article ko social media par bhejna hai
-        if (newArticle.image) {
+        if (newArticle.image && typeof publishEverywhere === 'function') {
           try {
             await publishEverywhere(newArticle); 
             console.log(`✅ Social Media Shared: ${item.title}`);
           } catch (socErr) {
-            console.error("Social media auto-share failed for this post:", socErr);
+            console.error("Social media auto-share failed for this post:", socErr.message);
           }
         }
       }
@@ -61,6 +62,6 @@ export async function syncExternalNews(req, res) {
 
   } catch (error) {
     console.error("Newsdata sync error:", error);
-    res.status(500).json({ success: false, message: "Automatic channel sync failed" });
+    res.status(500).json({ success: false, message: "Automatic channel sync failed", details: error.message });
   }
 }
