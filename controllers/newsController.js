@@ -11,9 +11,11 @@ export async function syncExternalNews(req, res) {
       return res.status(500).json({ success: false, message: "NEWSDATA_API_KEY missing in .env file" });
     }
 
-    // 👑 ULTIMATE BYPASS FIX: Domain parameter hata kar explicit query keyword parameter mapping use ki hai
-    // Isse Newsdata API 422 validation error nahi degi aur strictly NDTV/Bhaskar ka data pull karegi.
-    const url = `https://newsdata.io/api/1/news?apikey=${API_KEY}&country=in&language=hi&q=bhaskar%20OR%20ndtv`;
+    // 👑 RE-MAPPED QUERY BUILDER ENGINE (Exact matching from screenshot)
+    // - Endpoint changed to /latest
+    // - q is 'uttar pradesh', domains are locked to ndtv.in and navbharattimes.indiatimes.com
+    // - Filtered parameters for images added securely
+    const url = `https://newsdata.io/api/1/latest?apikey=${API_KEY}&q=uttar%20pradesh&country=in&language=hi&category=breaking,business,crime,education,politics&image=1&domainurl=ndtv.in,navbharattimes.indiatimes.com`;
 
     const apiResponse = await axios.get(url);
     const articles = apiResponse.data.results || [];
@@ -58,7 +60,7 @@ export async function syncExternalNews(req, res) {
 
     res.status(200).json({ 
       success: true, 
-      message: `Sync complete! ${newCount} nayi khabrein Bhaskar/NDTV framework se fetch ho gayi hain.` 
+      message: `Sync complete! ${newCount} nayi UP focused khabrein NDTV/Navbharat se successfully fetch ho gayi hain.` 
     });
 
   } catch (error) {
