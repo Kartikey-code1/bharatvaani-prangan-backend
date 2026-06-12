@@ -3,7 +3,6 @@ import slugify from 'slugify';
 import Article from '../models/article.js'; 
 import { publishEverywhere } from '../services/newsService.js';
 
-// 🔥 AUTOMATIC CHANNEL SYNC FOR DAINIK BHASKAR & NDTV (UPDATED REGION QUERY)
 export async function syncExternalNews(req, res) {
   try {
     const API_KEY = process.env.NEWSDATA_API_KEY; 
@@ -12,8 +11,8 @@ export async function syncExternalNews(req, res) {
       return res.status(500).json({ success: false, message: "NEWSDATA_API_KEY missing in .env file" });
     }
 
-    // 👑 FIX: Domain filters changed from 'abplive,ndtv' to 'bhaskar,ndtv'
-    const url = `https://newsdata.io/api/1/news?apikey=${API_KEY}&country=in&language=hi&domain=bhaskar,ndtv`;
+    // 👑 FIX: Passed full accurate domains to fix Newsdata.io 422 validation crash
+    const url = `https://newsdata.io/api/1/news?apikey=${API_KEY}&country=in&language=hi&domain=bhaskar.com,ndtv.in`;
 
     const apiResponse = await axios.get(url);
     const articles = apiResponse.data.results || [];
@@ -21,7 +20,6 @@ export async function syncExternalNews(req, res) {
     let newCount = 0;
 
     for (let item of articles) {
-      // Dono conditions check kar rahe hain taaki koi duplicate na ho
       const exists = await Article.findOne({
         $or: [
           { title: item.title },
@@ -30,11 +28,9 @@ export async function syncExternalNews(req, res) {
       });
       
       if (!exists) {
-        // Title validation safeguard strings clean up
         const articleTitle = item.title || "मुख्य समाचार";
         const slug = slugify(articleTitle, { lower: true, strict: true }) + '-' + Date.now();
         
-        // SAFE MAP ENGINE: Dono fields fill ho rahi hain schema requirements ke liye
         const newArticle = await Article.create({
           title: articleTitle,                       
           headline: articleTitle,                    
@@ -48,7 +44,6 @@ export async function syncExternalNews(req, res) {
 
         newCount++;
 
-        // Social handles trigger
         if (newArticle.image && typeof publishEverywhere === 'function') {
           try {
             await publishEverywhere(newArticle); 
@@ -60,10 +55,9 @@ export async function syncExternalNews(req, res) {
       }
     }
 
-    // Response message updated to reflect Bhaskar & NDTV
     res.status(200).json({ 
       success: true, 
-      message: `Sync complete! ${newCount} nayi khabrein Bhaskar/NDTV se aayi hain.` 
+      message: `Sync complete! ${newCount} nayi khabrein Dainik Bhaskar/NDTV se aayi hain.` 
     });
 
   } catch (error) {
