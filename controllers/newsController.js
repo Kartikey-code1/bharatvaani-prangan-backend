@@ -11,7 +11,8 @@ export async function syncExternalNews(req, res) {
       return res.status(500).json({ success: false, message: "NEWSDATA_API_KEY missing in .env file" });
     }
 
-    const url = `https://newsdata.io/api/1/latest?apikey=${API_KEY}&q=uttar%20pradesh&country=in&language=hi&category=breaking,business,crime,education,politics&image=1&domainurl=ndtv.in,navbharattimes.indiatimes.com`;
+    // 👑 BROAD ENHANCEMENT: Category filter hataya taaki UP ki koi bhi khabar miss na ho (More results fetch honge)
+    const url = `https://newsdata.io/api/1/latest?apikey=${API_KEY}&q=uttar%20pradesh&country=in&language=hi&image=1&domainurl=ndtv.in,navbharattimes.indiatimes.com`;
 
     const apiResponse = await axios.get(url);
     const articles = apiResponse.data.results || [];
@@ -30,27 +31,26 @@ export async function syncExternalNews(req, res) {
         const articleTitle = item.title || "मुख्य समाचार";
         const slug = slugify(articleTitle, { lower: true, strict: true }) + '-' + Date.now();
         
-        // 👑 SMART TEXT MERGE JUGAAD:
-        // Agar short description aur main content dono alag hain, toh hum dono ko combine kar dete hain 
-        // taaki article frontend par bada aur professional dikhe, ek line ka na lage!
         let fullContentText = "";
         if (item.description && item.content) {
-          // Agar dono alag hain toh dono jod do
           fullContentText = `${item.description}\n\n${item.content}`;
         } else {
           fullContentText = item.content || item.description || "पूरा समाचार पढ़ने के लिए बने रहें। Bharatvaani News.";
         }
 
-        // Agar content abhi bhi bohot chota hai, toh news source ka link snippet bhi add kar sakte hain optionally
-        if (item.link && fullContentText.length < 150) {
-          fullContentText += `\n\n(विस्तृत रिपोर्ट के लिए मुख्य स्रोत का अवलोकन करें।)`;
+        // 👑 DYNAMIC CATEGORY ASSIGNMENT:
+        // API se aane wali pehli category uthayega, agar nahi milti toh standard "National" rakhega
+        let articleCategory = "National";
+        if (item.category && item.category.length > 0) {
+          // Capitalize first letter (e.g., 'top' -> 'Top', 'politics' -> 'Politics')
+          articleCategory = item.category[0].charAt(0).toUpperCase() + item.category[0].slice(1);
         }
 
         const newArticle = await Article.create({
           title: articleTitle,                       
           headline: articleTitle,                    
-          content: fullContentText, // 👈 Ab yahan dynamic combined text jayega
-          category: "National", 
+          content: fullContentText, 
+          category: articleCategory, // 👈 Ab category frontend filters ke sath mismatch nahi karegi
           image: item.image_url || null,
           video: item.video_url || null,
           slug: slug,
@@ -62,7 +62,6 @@ export async function syncExternalNews(req, res) {
         if (newArticle.image && typeof publishEverywhere === 'function') {
           try {
             await publishEverywhere(newArticle); 
-            console.log(`✅ Social Media Queue Triggered: ${articleTitle}`);
           } catch (socErr) {
             console.error("Social media automation delay skipped:", socErr.message);
           }
@@ -72,7 +71,7 @@ export async function syncExternalNews(req, res) {
 
     res.status(200).json({ 
       success: true, 
-      message: `Sync complete! ${newCount} expanded articles fetched.` 
+      message: `Sync complete! ${newCount} fresh broad articles fetched successfully.` 
     });
 
   } catch (error) {
