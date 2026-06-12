@@ -3,7 +3,7 @@ import slugify from 'slugify';
 import Article from '../models/article.js'; 
 import { publishEverywhere } from '../services/newsService.js';
 
-// 🔥 AUTOMATIC CHANNEL SYNC FOR ABP & NDTV (FINAL RE-MAPPED MECHANISM)
+// 🔥 AUTOMATIC CHANNEL SYNC FOR DAINIK BHASKAR & NDTV (UPDATED REGION QUERY)
 export async function syncExternalNews(req, res) {
   try {
     const API_KEY = process.env.NEWSDATA_API_KEY; 
@@ -12,8 +12,8 @@ export async function syncExternalNews(req, res) {
       return res.status(500).json({ success: false, message: "NEWSDATA_API_KEY missing in .env file" });
     }
 
-    // Domain filters lock: abplive,ndtv aur language Hindi (hi)
-    const url = `https://newsdata.io/api/1/news?apikey=${API_KEY}&country=in&language=hi&domain=abplive,ndtv`;
+    // 👑 FIX: Domain filters changed from 'abplive,ndtv' to 'bhaskar,ndtv'
+    const url = `https://newsdata.io/api/1/news?apikey=${API_KEY}&country=in&language=hi&domain=bhaskar,ndtv`;
 
     const apiResponse = await axios.get(url);
     const articles = apiResponse.data.results || [];
@@ -34,10 +34,10 @@ export async function syncExternalNews(req, res) {
         const articleTitle = item.title || "मुख्य समाचार";
         const slug = slugify(articleTitle, { lower: true, strict: true }) + '-' + Date.now();
         
-        // 👑 SAFE MAP ENGINE: Title aur Headline dono ko bhar diya taaki validation fail na ho!
+        // SAFE MAP ENGINE: Dono fields fill ho rahi hain schema requirements ke liye
         const newArticle = await Article.create({
-          title: articleTitle,                       // 👈 Path `title` is satisfied!
-          headline: articleTitle,                    // 👈 Path `headline` is satisfied!
+          title: articleTitle,                       
+          headline: articleTitle,                    
           content: item.description || item.content || "पूरा समाचार पढ़ने के लिए बने रहें।",
           category: "National", 
           image: item.image_url || null,
@@ -60,9 +60,10 @@ export async function syncExternalNews(req, res) {
       }
     }
 
+    // Response message updated to reflect Bhaskar & NDTV
     res.status(200).json({ 
       success: true, 
-      message: `Sync complete! ${newCount} nayi khabrein ABP/NDTV se aayi hain.` 
+      message: `Sync complete! ${newCount} nayi khabrein Bhaskar/NDTV se aayi hain.` 
     });
 
   } catch (error) {
