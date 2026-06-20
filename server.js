@@ -26,7 +26,7 @@ app.post("/api/admin/login", (req, res) => {
   return res.status(401).json({ success: false, message: "Galat Email ya Password!" });
 });
 
-// 👑 SEO DYNAMIC SITEMAP GENERATOR ENGINE
+// 👑 SEO DYNAMIC SITEMAP GENERATOR ENGINE (UPDATED WITH CUSTOM REAL DOMAIN)
 // Ye route Google aur baaki search engines ko automatic naye news articles ke links provide karega
 app.get("/sitemap.xml", async (req, res) => {
   try {
@@ -36,19 +36,19 @@ app.get("/sitemap.xml", async (req, res) => {
     let xml = `<?xml version="1.0" encoding="UTF-8"?>`;
     xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">`;
     
-    // 1. Website ka Main Homepage Link (Vercel Production Domain)
+    // 1. Website ka REAL Custom Domain Homepage Link
     xml += `
     <url>
-      <loc>https://bharatvaani-news.vercel.app/</loc> 
+      <loc>https://www.bharatvaaniprangan.com/</loc> 
       <priority>1.0</priority>
       <changefreq>always</changefreq>
     </url>`;
     
-    // 2. Saare live news articles ke slugs ko automatic loop chala kar insert karenge
+    // 2. Saare live news articles ke slugs ko custom domain ke sath automatic insert karenge
     articles.forEach((art) => {
       xml += `
       <url>
-        <loc>https://bharatvaani-news.vercel.app/article/${art.slug}</loc>
+        <loc>https://www.bharatvaaniprangan.com/article/${art.slug}</loc>
         <lastmod>${new Date(art.updatedAt).toISOString().split("T")[0]}</lastmod>
         <priority>0.8</priority>
         <changefreq>daily</changefreq>
